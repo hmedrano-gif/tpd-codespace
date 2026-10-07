@@ -1,0 +1,47 @@
+# Kafka (1 broker + ZooKeeper) y un contenedor de Spark en la misma red.
+# Uso (desde esta carpeta):   docker compose up -d
+#
+# Dos "puertas" (listeners) al mismo broker:
+#   localhost:9092  -> para los programas de Python que corren en tu Windows (app_viajes.py, simulador.py, consumidor_consola.py)
+#   kafka:29092     -> para Spark, que corre dentro de la red de Docker
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka
+    depends_on: [zookeeper]
+    # Si Kafka arranca mientras ZooKeeper aún guarda el registro del broker de la sesión anterior (caduca en ~18 s),
+    # termina con «NodeExists» y Exited (1). Docker lo reintenta solo hasta que entra; docker compose stop no lo reinicia.
+    restart: on-failure
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: INTERNO://0.0.0.0:29092,EXTERNO://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNO://kafka:29092,EXTERNO://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNO:PLAINTEXT,EXTERNO:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNO
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+  spark:
+    image: spark:3.5.9-python3
+    container_name: spark
+    user: root                         # entorno de laboratorio: permite escribir la caché del conector
+    command: ["sleep", "infinity"]     # queda encendido; los jobs se lanzan con docker compose exec
+    ports:
+      - "4040:4040"
+    volumes:
+      - ./:/opt/kafka-taller           # streaming_viajes.py, verificar_conector.py y zonas.csv
+      - ivy:/tmp/.ivy2                 # caché del conector Spark-Kafka (se descarga una sola vez)
+
+volumes:
+  ivy:

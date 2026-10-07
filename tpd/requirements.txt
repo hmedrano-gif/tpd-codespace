@@ -1,0 +1,4 @@
+pyarrow==24.0.0
+pandas==2.3.3
+streamlit==1.56.0
+kafka-python==2.3.2

@@ -1,0 +1,50 @@
+# Clúster Hadoop pseudo-distribuido (1 máquina, 5 contenedores).
+# Basado en el docker-compose oficial del proyecto Apache Hadoop (rama docker-hadoop-3),
+# con la imagen apache/hadoop:3.4.3 (Ubuntu 22.04, Java 11, trae Python 3 para Hadoop Streaming).
+#
+# Uso (desde esta carpeta):   docker compose up -d
+# Consolas web:  HDFS http://localhost:9870   YARN http://localhost:8088   Historial http://localhost:19888
+
+x-hadoop: &hadoop
+  image: apache/hadoop:3.4.3
+  env_file:
+    - ./config
+  volumes:
+    - ../datos:/opt/datos:ro      # los CSV del dataset (solo lectura)
+    - ./:/opt/codigo              # mapper.py y reducer.py
+
+services:
+  namenode:
+    <<: *hadoop
+    hostname: namenode
+    command: ["hdfs", "namenode"]
+    ports:
+      - "9870:9870"
+    environment:
+      # Si esta carpeta no existe, el contenedor formatea HDFS la primera vez.
+      # La imagen corre como usuario "hadoop", por eso la ruta es /tmp/hadoop-hadoop.
+      ENSURE_NAMENODE_DIR: "/tmp/hadoop-hadoop/dfs/name"
+
+  datanode:
+    <<: *hadoop
+    hostname: datanode
+    command: ["hdfs", "datanode"]
+
+  resourcemanager:
+    <<: *hadoop
+    hostname: resourcemanager
+    command: ["yarn", "resourcemanager"]
+    ports:
+      - "8088:8088"
+
+  nodemanager:
+    <<: *hadoop
+    hostname: nodemanager
+    command: ["yarn", "nodemanager"]
+
+  historyserver:
+    <<: *hadoop
+    hostname: historyserver
+    command: ["mapred", "historyserver"]
+    ports:
+      - "19888:19888"

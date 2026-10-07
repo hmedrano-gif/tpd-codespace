@@ -1,0 +1,8 @@
+{
+  "name": "Tecnologias de Procesamiento de Datos",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "hostRequirements": { "cpus": 4, "memory": "16gb" },
+  "postCreateCommand": "pip install -r tpd/requirements.txt && printf 'tpd/datos/*.csv\\ntpd/datos/*.parquet\\ntpd/spark/output_spark/\\n__pycache__/\\n' >> .git/info/exclude",
+  "postStartCommand": "sudo iptables-legacy -P FORWARD ACCEPT || true",
+  "forwardPorts": [9870, 8088, 19888, 4040, 8501]
+}

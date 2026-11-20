@@ -5,6 +5,7 @@ Ejecutar (terminal del codespace, desde tpd/spark), por ejemplo la pregunta 3:
         /opt/spark/bin/spark-submit job_proyecto.py --pregunta p3
 Desde el Parquet oficial:     ... job_proyecto.py --pregunta p3 --parquet
 Con N núcleos:                ... job_proyecto.py --pregunta p3 --parquet --nucleos 2
+Con otro mes de 2025:         ... job_proyecto.py --pregunta p2 --mes 2025-09   (primero: python preparar_datos.py --mes 2025-09)
 El resultado queda en spark/output_proyecto_p3 (un CSV con encabezado) y se imprime en pantalla.
 """
 import sys
@@ -17,7 +18,9 @@ from pyspark.sql.types import DoubleType, IntegerType, LongType, StringType, Str
 PREGUNTA = sys.argv[sys.argv.index("--pregunta") + 1]
 PARQUET = "--parquet" in sys.argv
 NUCLEOS = sys.argv[sys.argv.index("--nucleos") + 1] if "--nucleos" in sys.argv else "*"
-ARCHIVO = "../datos/fhvhv_tripdata_2025-06.parquet" if PARQUET else "../datos/fhvhv_2025-06.csv"
+MES = sys.argv[sys.argv.index("--mes") + 1] if "--mes" in sys.argv else "2025-06"
+ARCHIVO = f"../datos/fhvhv_tripdata_{MES}.parquet" if PARQUET else f"../datos/fhvhv_{MES}.csv"
+SALIDA = f"output_proyecto_{PREGUNTA}" if MES == "2025-06" else f"output_proyecto_{PREGUNTA}_{MES}_{'parquet' if PARQUET else 'csv'}"
 
 TEXTO, FECHA, ENTERO, LARGO, DECIMAL = StringType(), TimestampType(), IntegerType(), LongType(), DoubleType()
 esquema = StructType()
@@ -104,8 +107,8 @@ else:
     sys.exit(f"Pregunta desconocida: {PREGUNTA} (use p1 a p8)")
 
 r.show(30, truncate=False)
-r.coalesce(1).write.mode("overwrite").csv(f"output_proyecto_{PREGUNTA}", header=True)
-print(f"Pregunta {PREGUNTA} · {'Parquet' if PARQUET else 'CSV'} · núcleos: {spark.sparkContext.defaultParallelism} · "
+r.coalesce(1).write.mode("overwrite").csv(SALIDA, header=True)
+print(f"Pregunta {PREGUNTA} · mes {MES} · {'Parquet' if PARQUET else 'CSV'} · núcleos: {spark.sparkContext.defaultParallelism} · "
       f"tiempo total (incluye arranque de Spark): {time.time() - inicio:.1f} s")
 
 # La Spark UI (puerto 4040) solo existe mientras la sesión esté abierta; espera Enter si hay terminal (docker run -it).

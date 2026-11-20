@@ -69,24 +69,25 @@ T_HADOOP=$(( $(date +%s) - t0 ))
 $NN hdfs dfs -test -e "/mes/$PREG/_SUCCESS" || { docker compose stop; falla "el MapReduce de Hadoop"; }
 SAL_HADOOP="resultado_${MES}_${PREG}_hadoop.tsv"
 $NN hdfs dfs -cat "/mes/$PREG/part-*" > "$SAL_HADOOP"
-echo; cat "$SAL_HADOOP"
+echo; tr -d "#" < "$SAL_HADOOP" | column -t -s $'\t'
 echo; echo "Hadoop: $(mmss $T_HADOOP) · resultado guardado en tpd/hadoop/$SAL_HADOOP"
 docker compose stop >/dev/null 2>&1
 pausa "Sigue Spark con el mismo CSV"
 
-spark() {  # spark "--parquet" o ""
+spark() {  # spark "--parquet" o "" · deja en SEG el tiempo que reporta el propio Spark
   docker run --rm -v "$TPD":/opt/tpd -w /opt/tpd/spark spark:3.5.9-python3 \
     /opt/spark/bin/spark-submit job_proyecto.py --pregunta "$PREG" --mes "$MES" $1 2>&1 \
-    | grep -v -E "^\s*$|WARN|INFO|NativeCodeLoader|Setting default log level|To adjust logging level"
+    | grep -v -E "^\s*$|WARN|INFO|NativeCodeLoader|Setting default log level|To adjust logging level" | tee /tmp/spark_salida.txt
+  SEG=$(grep -o 'arranque de Spark): [0-9.]* s' /tmp/spark_salida.txt | grep -o '[0-9.]*' | tr . ,)
 }
 titulo "3 de 5 · Spark con el CSV de tu mes (~1 min)"
 cd "$TPD/spark" || falla "la carpeta tpd/spark"
-t0=$(date +%s); spark "" || falla "Spark con CSV"; T_CSV=$(( $(date +%s) - t0 ))
+spark "" || falla "Spark con CSV"; T_CSV="$SEG s"
 ls "output_proyecto_${PREG}_${MES}_csv"/_SUCCESS >/dev/null 2>&1 || falla "Spark con CSV (no dejó resultado)"
 pausa "Sigue Spark con Parquet: el mismo mes en formato por columnas"
 
-titulo "4 de 5 · Spark con el Parquet de tu mes (~40 s)"
-t0=$(date +%s); spark "--parquet" || falla "Spark con Parquet"; T_PARQ=$(( $(date +%s) - t0 ))
+titulo "4 de 5 · Spark con el Parquet de tu mes (~30 s)"
+spark "--parquet" || falla "Spark con Parquet"; T_PARQ="$SEG s"
 ls "output_proyecto_${PREG}_${MES}_parquet"/_SUCCESS >/dev/null 2>&1 || falla "Spark con Parquet (no dejó resultado)"
 
 titulo "5 de 5 · Tus tiempos con $MES ($VIAJES viajes, pregunta $PREG)"
@@ -99,8 +100,8 @@ print(sum(int(r['viajes']) for r in csv.DictReader(open(f))))")
 {
   echo "Mes $MES · $VIAJES viajes · pregunta $PREG"
   printf '%-22s %s\n' "Hadoop (MapReduce)" "$(mmss $T_HADOOP)"
-  printf '%-22s %s\n' "Spark con CSV" "$(mmss $T_CSV)"
-  printf '%-22s %s\n' "Spark con Parquet" "$(mmss $T_PARQ)"
+  printf '%-22s %s\n' "Spark con CSV" "$T_CSV"
+  printf '%-22s %s\n' "Spark con Parquet" "$T_PARQ"
   printf '%-22s %s\n' "BigQuery" "(el de tu Taller 2A, en Información del trabajo)"
   if [ "$PREG" = "p2" ]; then
     if [ "$V_H" = "$V_S" ]; then echo "Cifras: Hadoop y Spark suman los mismos $V_S viajes ✓"
